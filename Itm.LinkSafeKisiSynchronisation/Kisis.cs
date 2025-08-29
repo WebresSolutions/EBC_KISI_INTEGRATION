@@ -34,74 +34,6 @@ public partial class Kisis
     }
 
     /// <summary>
-    /// Generates a standardized name for group links based on email and validity dates.
-    /// </summary>
-    /// <param name="email">The email address of the worker</param>
-    /// <param name="validFrom">Optional start date for validity period</param>
-    /// <param name="validUntil">Optional end date for validity period</param>
-    /// <returns>A formatted name string for the group link</returns>
-    public string GetName(string email, DateTime? validFrom = null, DateTime? validUntil = null) =>
-        $"{_config.Value.NamePrefix} {email}: {validFrom} - {validUntil}";
-
-    /// <summary>
-    /// Creates a new group link in Kisi for a worker with specified validity dates.
-    /// </summary>
-    /// <param name="email">The email address of the worker</param>
-    /// <param name="validFrom">Optional start date for access validity</param>
-    /// <param name="validUntil">Optional end date for access validity</param>
-    /// <param name="cancellationToken">Cancellation token for the operation</param>
-    /// <returns>A task representing the asynchronous operation</returns>
-    public async Task MakeGroupLink(string email, DateTime? validFrom = null, DateTime? validUntil = null,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            RestRequest request = new("group_links", Method.Post);
-            request.AddJsonBody(new GroupLinkCreateModel
-            {
-                GroupLink = new GroupLink()
-                {
-                    Name = GetName(email, validFrom, validUntil),
-                    Email = email,
-                    GroupId = _config.Value.GroupId,
-                    ValidUntil = validUntil,
-                    ValidFrom = validFrom
-
-                }
-
-            });
-
-            RestResponse content = await _client.ExecuteAsync(request, cancellationToken: cancellationToken);
-            _logger.LogInformation("Id: {id}", content.Content);
-        }
-        catch (Exception e)
-        {
-            _logger.LogCritical(e, "failed to remove group link");
-
-            _errorService.AddErrorLog($"failed to make a group link for {email} with the ranges of {validFrom} - {validUntil}");
-        }
-    }
-
-    /// <summary>
-    /// Removes a group link from Kisi by its ID.
-    /// </summary>
-    /// <param name="id">The ID of the group link to remove</param>
-    /// <param name="cancellationToken">Cancellation token for the operation</param>
-    /// <returns>A task representing the asynchronous operation</returns>
-    public async Task RemoveGroupLink(int id, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await _client.DeleteAsync(new RestRequest($"group_link/{id}"), cancellationToken: cancellationToken);
-        }
-        catch (Exception e)
-        {
-            _logger.LogCritical(e, "failed to remove group link");
-            _errorService.AddErrorLog($"failed to remove the group link Id:{id}");
-        }
-    }
-
-    /// <summary>
     /// Synchronizes group links for a specific email address by ensuring only valid date ranges exist.
     /// Removes any existing group links that don't match the provided date ranges and creates new ones as needed.
     /// </summary>
@@ -233,6 +165,75 @@ public partial class Kisis
             return (link, request, content);
         }
     }
+
+    /// <summary>
+    /// Generates a standardized name for group links based on email and validity dates.
+    /// </summary>
+    /// <param name="email">The email address of the worker</param>
+    /// <param name="validFrom">Optional start date for validity period</param>
+    /// <param name="validUntil">Optional end date for validity period</param>
+    /// <returns>A formatted name string for the group link</returns>
+    public string GetName(string email, DateTime? validFrom = null, DateTime? validUntil = null) =>
+        $"{_config.Value.NamePrefix} {email}: {validFrom} - {validUntil}";
+
+    /// <summary>
+    /// Creates a new group link in Kisi for a worker with specified validity dates.
+    /// </summary>
+    /// <param name="email">The email address of the worker</param>
+    /// <param name="validFrom">Optional start date for access validity</param>
+    /// <param name="validUntil">Optional end date for access validity</param>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>A task representing the asynchronous operation</returns>
+    public async Task MakeGroupLink(string email, DateTime? validFrom = null, DateTime? validUntil = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            RestRequest request = new("group_links", Method.Post);
+            request.AddJsonBody(new GroupLinkCreateModel
+            {
+                GroupLink = new GroupLink()
+                {
+                    Name = GetName(email, validFrom, validUntil),
+                    Email = email,
+                    GroupId = _config.Value.GroupId,
+                    ValidUntil = validUntil,
+                    ValidFrom = validFrom
+
+                }
+
+            });
+
+            RestResponse content = await _client.ExecuteAsync(request, cancellationToken: cancellationToken);
+            _logger.LogInformation("Id: {id}", content.Content);
+        }
+        catch (Exception e)
+        {
+            _logger.LogCritical(e, "failed to remove group link");
+
+            _errorService.AddErrorLog($"failed to make a group link for {email} with the ranges of {validFrom} - {validUntil}");
+        }
+    }
+
+    /// <summary>
+    /// Removes a group link from Kisi by its ID.
+    /// </summary>
+    /// <param name="id">The ID of the group link to remove</param>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>A task representing the asynchronous operation</returns>
+    public async Task RemoveGroupLink(int id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _client.DeleteAsync(new RestRequest($"group_link/{id}"), cancellationToken: cancellationToken);
+        }
+        catch (Exception e)
+        {
+            _logger.LogCritical(e, "failed to remove group link");
+            _errorService.AddErrorLog($"failed to remove the group link Id:{id}");
+        }
+    }
+
 
     /// <summary>
     /// Generates a regex pattern for parsing collection range headers from Kisi API responses.

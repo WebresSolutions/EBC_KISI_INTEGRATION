@@ -36,7 +36,8 @@ public class LinkSafe
     /// <returns>An array of worker models containing induction information</returns>
     public async Task<WorkerModel[]> GetWorkers()
     {
-        WorkersModel? content = await _client.GetJsonAsync<WorkersModel>("2.0/Compliance/Workers/List");
+        var res = await _client.ExecuteGetAsync("2.0/Compliance/Workers/List");
+        WorkersModel? content = await _client.GetAsync<WorkersModel>("2.0/Compliance/Workers/List");
         return content?.Workers ?? [];
     }
 }
