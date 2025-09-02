@@ -2,6 +2,7 @@ using Itm.LinkSafeKisiSynchronisation.LinkSafeModels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RestSharp;
+using System.Text.Json;
 
 namespace Itm.LinkSafeKisiSynchronisation;
 
@@ -36,8 +37,24 @@ public class LinkSafe
     /// <returns>An array of worker models containing induction information</returns>
     public async Task<WorkerModel[]> GetWorkers()
     {
-        var res = await _client.ExecuteGetAsync("2.0/Compliance/Workers/List");
-        WorkersModel? content = await _client.GetAsync<WorkersModel>("2.0/Compliance/Workers/List");
+        var response = await _client.ExecuteGetAsync("2.0/Compliance/Workers/List");
+
+        if (response.Content == null)
+            return [];
+
+        WorkersModel? content = JsonSerializer.Deserialize<WorkersModel>(response.Content);
+        if (content is null)
+            return [];
+        
+        #if  DEBUG
+        if (content.Workers is [] or null)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "workers.json");
+            string workersString = await File.ReadAllTextAsync(path);
+            content = JsonSerializer.Deserialize<WorkersModel>(workersString);
+        }
+        #endif
+
         return content?.Workers ?? [];
     }
 }
@@ -50,5 +67,5 @@ public class LinkSafeConfig
     /// <summary>
     /// Gets or sets the API token for authenticating with LinkSafe.
     /// </summary>
-    public string ApiToken { get; set; }
+    public required string ApiToken { get; set; }
 }

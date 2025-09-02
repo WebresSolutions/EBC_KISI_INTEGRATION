@@ -54,7 +54,9 @@ public partial class Kisis
 
             _logger.LogInformation("getting page {pageCount}", pageCount);
             (RestRequest link, RestResponse request, List<GroupLinksModel> content) = await GetGroupLinks(pageCount, cancellationToken);
-            
+
+            List<Tuple<string?, int>> links = content.GroupBy(x => x.Name).Select(a => Tuple.Create(a.Key, a.Count())).ToList();
+
             _logger.LogInformation("doing clean up");
             if (content?.Count > 0)
             {
@@ -103,8 +105,8 @@ public partial class Kisis
                 }
             }
             _logger.LogInformation("DONE doing clean up");
-            
-            
+
+
             request = await _client.GetAsync(link, cancellationToken: cancellationToken);
             content = JsonSerializer.Deserialize<List<GroupLinksModel>>(request.Content) ?? [];
             _logger.LogInformation("adding new links");
@@ -157,7 +159,7 @@ public partial class Kisis
             RestRequest link = new("group_links");
             link.AddQueryParameter("limit", 250).AddQueryParameter("offset", pageCount * 250);
             RestResponse request = await _client.GetAsync(link, cancellationToken: cancellationToken);
-            
+
             if (request.Content is null)
                 return (link, request, []);
 

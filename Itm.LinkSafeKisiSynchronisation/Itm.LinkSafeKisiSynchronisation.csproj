@@ -26,4 +26,7 @@
     <ItemGroup>
         <Using Include="System.Threading.ExecutionContext" Alias="ExecutionContext" />
     </ItemGroup>
+	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
+		<None Update="workers.json" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
 </Project>

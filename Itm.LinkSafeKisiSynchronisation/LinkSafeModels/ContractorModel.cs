@@ -8,7 +8,7 @@ public class ContractorsModel
     /// <summary>
     /// Gets or sets the array of contractor models.
     /// </summary>
-    public ContractorModel[] Contractors { get; set; }
+    public ContractorModel[] Contractors { get; set; } = [];
 }
 
 /// <summary>
@@ -20,11 +20,11 @@ public class ContractorModel
     /// Gets or sets the unique identifier for the contractor in LinkSafe.
     /// </summary>
     public int ContractorId { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the array of contact records for the contractor.
     /// </summary>
-    public ContactModel[] Contacts { get; set; }
+    public ContactModel[] Contacts { get; set; } = [];
 }
 
 /// <summary>
@@ -40,10 +40,10 @@ public class ContactModel
     /// <summary>
     /// Gets or sets the type of contact (e.g., primary, secondary).
     /// </summary>
-    public string ContactType { get; set; }
-    
+    public string ContactType { get; set; } = string.Empty;
+
     /// <summary>
     /// Gets or sets the email address of the contact.
     /// </summary>
-    public string EmailAddress { get; set; }
+    public string EmailAddress { get; set; } = string.Empty;
 }

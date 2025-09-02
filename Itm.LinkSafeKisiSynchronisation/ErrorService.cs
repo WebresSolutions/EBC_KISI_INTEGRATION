@@ -1,6 +1,6 @@
+using Microsoft.Extensions.Options;
 using System.Net;
 using System.Net.Mail;
-using Microsoft.Extensions.Options;
 
 namespace Itm.LinkSafeKisiSynchronisation;
 
@@ -23,7 +23,7 @@ public class ErrorService : IDisposable
     /// <summary>
     /// Gets or sets the collection of error logs with timestamps and messages.
     /// </summary>
-    public List<(DateTime TimeStamp, string Message)> Content = new List<(DateTime timeStamp, string Message)>();
+    public List<(DateTime TimeStamp, string Message)> Content = [];
     private readonly IOptions<EmailConfig> _config;
 
     /// <summary>
@@ -46,13 +46,13 @@ public class ErrorService : IDisposable
         // ToDo: send pending email
         if (Content.Count != 0)
         {
-            var smtpClient = new SmtpClient(_config.Value.Smtp)
+            SmtpClient smtpClient = new(_config.Value.Smtp)
             {
                 Port = 587,
                 Credentials = new NetworkCredential(_config.Value.Username, _config.Value.Password),
                 EnableSsl = true,
             };
-            var mailMessage = new MailMessage
+            MailMessage mailMessage = new()
             {
                 From = new MailAddress("dev@itm.dev"),
                 Subject = "LinkSafe Kisi Synchronisation Error",
@@ -62,7 +62,7 @@ public class ErrorService : IDisposable
             mailMessage.To.Add("recipient");
 
             smtpClient.Send(mailMessage);
-            
+
             Content.Clear();
         }
     }
@@ -88,15 +88,15 @@ public class EmailConfig
     /// <summary>
     /// Gets or sets the SMTP server address for sending error emails.
     /// </summary>
-    public string Smtp { get; set; }
-    
+    public string Smtp { get; set; } = string.Empty;
+
     /// <summary>
     /// Gets or sets the username for SMTP authentication.
     /// </summary>
-    public string Username { get; set; }
-    
+    public string Username { get; set; } = string.Empty;
+
     /// <summary>
     /// Gets or sets the password for SMTP authentication.
     /// </summary>
-    public string Password { get; set; }
+    public string Password { get; set; } = string.Empty;
 }

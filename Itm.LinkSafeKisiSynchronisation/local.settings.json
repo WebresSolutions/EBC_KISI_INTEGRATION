@@ -3,7 +3,7 @@
     "Values": {
         "AzureWebJobsStorage": "UseDevelopmentStorage=true",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-        "KisisConfig__ApiToken": "9fb97d3db4e900bfdcef4ee2598e529b",
+        "KisisConfig__ApiToken": "2357e6c9c1b2a5226e1cc99911e7ba28",
         "KisisConfig__NamePrefix": "AUTO__",
         "KisisConfig__GroupId": 34037,
         "LinkSafeConfig__ApiToken": "71E68617F30BB5A8666B94BF9F29262FEC1462CDE8D1C7B753A6122A0B8D0108"

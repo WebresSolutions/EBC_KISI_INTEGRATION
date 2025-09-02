@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-var host = new HostBuilder()
+IHost host = new HostBuilder()
     .ConfigureAppConfiguration(builder =>
     {
     })
@@ -18,7 +18,7 @@ var host = new HostBuilder()
         services.AddScoped<Kisis>();
         services.AddScoped<LinkSafe>();
     })
-    
+
     .Build();
 
 host.Run();
