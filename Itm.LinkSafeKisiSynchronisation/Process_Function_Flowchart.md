@@ -1,12 +1,12 @@
 # Process Function Flowchart
 
-This flowchart shows exactly what happens when the `Process()` function is called in the Timer class. **Note: This function only executes in DEBUG mode - in release builds, it will do nothing.**
+This flowchart shows exactly what happens when the this Azure function is called.
 
 ```mermaid
 flowchart TD
     A[Start: Process Function Called] --> B{DEBUG Mode?}
     B -->|No| C[Do Nothing<br/>Return Task.CompletedTask]
-    B -->|Yes| D[Initialize contracts Dictionary<br/>Key: email, Value: HashSet of date ranges]
+    B -->|Yes| D[Initialize workersAndInductions Dictionary<br/>Key: email, Value: HashSet of date ranges]
     
     D --> E[Call linkSafe.GetWorkers]
     
@@ -20,10 +20,10 @@ flowchart TD
     J --> K
     
     K --> L[For Each Worker in Array]
-    L --> M{Worker Email<br/>Exists in contracts?}
+    L --> M{Worker Email<br/>Exists in workersAndInductions?}
     M -->|No| N[Create new HashSet<br/>for this email]
     M -->|Yes| O[Get existing HashSet]
-    N --> P[Add to contracts dictionary]
+    N --> P[Add to workersAndInductions dictionary]
     O --> P
     
     P --> Q[For Each Induction in Worker]
@@ -32,11 +32,11 @@ flowchart TD
     S -->|Yes| Q
     S -->|No| T{More Workers?}
     T -->|Yes| L
-    T -->|No| U[For Each Contract in contracts]
+    T -->|No| U[For Each Contract in workersAndInductions]
     
     U --> V[Call kisis.SyncGroupLinks<br/>with email and date ranges]
     
-    V --> W[Kisi Sync Process:<br/>Get existing group links]
+    V --> W[Kisi Sync Process:<br/>Get existing group links from the Kisi API]
     W --> X[Paginate through results<br/>250 per page]
     X --> Y[Filter links by:<br/>- Name prefix match<br/>- Email contains worker email]
     
@@ -57,7 +57,7 @@ flowchart TD
     II -->|Yes| FF
     II -->|No| JJ{More pages?}
     JJ -->|Yes| X
-    JJ -->|No| KK{More contracts?}
+    JJ -->|No| KK{More workersAndInductions?}
     
     KK -->|Yes| U
     KK -->|No| LL[Process Complete]

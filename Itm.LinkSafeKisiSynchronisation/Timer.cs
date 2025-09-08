@@ -81,7 +81,7 @@ public class Timer(
             // Dictionary to store worker contracts by email address
             // Key: Worker's email address
             // Value: HashSet of tuples containing (validFrom, validUntil) dates for each contract/induction period
-            Dictionary<string, HashSet<(DateTime validFrom, DateTime validUntil)>> contracts = [];
+            Dictionary<string, HashSet<(DateTime validFrom, DateTime validUntil)>> workersAndInductions = [];
 
             // Retrieve all workers from LinkSafe system
             WorkerModel[] workers = await linkSafe.GetWorkers();
@@ -91,10 +91,10 @@ public class Timer(
             {
                 // Check if we already have an entry for this worker's email address
                 // If not, create a new HashSet to store their contract periods
-                if (!contracts.TryGetValue(worker.EmailAddress, out HashSet<(DateTime validFrom, DateTime validUntil)>? value))
+                if (!workersAndInductions.TryGetValue(worker.EmailAddress, out HashSet<(DateTime validFrom, DateTime validUntil)>? value))
                 {
                     value = [];
-                    contracts.Add(worker.EmailAddress, value);
+                    workersAndInductions.Add(worker.EmailAddress, value);
                 }
 
                 // Add each induction period (contract period) for this worker
@@ -105,7 +105,7 @@ public class Timer(
 
             // Synchronize each worker's access permissions in Kisi system
             // For each worker, send their contract periods to Kisi to update their access rights
-            foreach (KeyValuePair<string, HashSet<(DateTime validFrom, DateTime validUntil)>> contract in contracts)
+            foreach (KeyValuePair<string, HashSet<(DateTime validFrom, DateTime validUntil)>> contract in workersAndInductions)
                 await kisis.SyncGroupLinks(contract.Key, [.. contract.Value]);
         }
         catch (Exception ex)

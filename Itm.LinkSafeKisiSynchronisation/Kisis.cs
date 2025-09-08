@@ -17,7 +17,7 @@ public partial class Kisis
     private readonly ErrorService _errorService;
     private readonly ILogger<Kisis> _logger;
     private readonly IOptions<KisisConfig> _config;
-
+    private static bool _readOnly = true;
     /// <summary>
     /// Initializes a new instance of the Kisi service with required dependencies.
     /// </summary>
@@ -54,8 +54,6 @@ public partial class Kisis
 
             _logger.LogInformation("getting page {pageCount}", pageCount);
             (RestRequest link, RestResponse request, List<GroupLinksModel> content) = await GetGroupLinks(pageCount, cancellationToken);
-
-            List<Tuple<string?, int>> links = content.GroupBy(x => x.Name).Select(a => Tuple.Create(a.Key, a.Count())).ToList();
 
             _logger.LogInformation("doing clean up");
             if (content?.Count > 0)
@@ -206,8 +204,11 @@ public partial class Kisis
 
             });
 
-            RestResponse content = await _client.ExecuteAsync(request, cancellationToken: cancellationToken);
-            _logger.LogInformation("Id: {id}", content.Content);
+            if (!_readOnly)
+            {
+                RestResponse content = await _client.ExecuteAsync(request, cancellationToken: cancellationToken);
+                _logger.LogInformation("Id: {id}", content.Content);
+            }
         }
         catch (Exception e)
         {
@@ -227,7 +228,8 @@ public partial class Kisis
     {
         try
         {
-            await _client.DeleteAsync(new RestRequest($"group_link/{id}"), cancellationToken: cancellationToken);
+            if (!_readOnly)
+                await _client.DeleteAsync(new RestRequest($"group_link/{id}"), cancellationToken: cancellationToken);
         }
         catch (Exception e)
         {
