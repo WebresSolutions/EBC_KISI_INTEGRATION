@@ -1,3 +1,6 @@
+
+using System.Text.Json.Serialization;
+
 namespace Itm.LinkSafeKisiSynchronisation.LinkSafeModels;
 
 /// <summary>
@@ -8,42 +11,135 @@ public class ContractorsModel
     /// <summary>
     /// Gets or sets the array of contractor models.
     /// </summary>
-    public ContractorModel[] Contractors { get; set; } = [];
+    [JsonPropertyName("contractors")]
+    public Contractor[] Contractors { get; set; } = [];
 }
 
-/// <summary>
-/// Model representing a contractor with their contact information from LinkSafe.
-/// </summary>
-public class ContractorModel
+public class Contractor
 {
-    /// <summary>
-    /// Gets or sets the unique identifier for the contractor in LinkSafe.
-    /// </summary>
-    public int ContractorId { get; set; }
+    [JsonPropertyName("contractorID")]
+    public int ContractorID { get; set; }
 
-    /// <summary>
-    /// Gets or sets the array of contact records for the contractor.
-    /// </summary>
-    public ContactModel[] Contacts { get; set; } = [];
+    [JsonPropertyName("externalReferenceNumber")]
+    public object? ExternalReferenceNumber { get; set; }
+
+    [JsonPropertyName("principalContractorID")]
+    public object? PrincipalContractorID { get; set; }
+
+    [JsonPropertyName("isCompliant")]
+    public bool IsCompliant { get; set; }
+
+    [JsonPropertyName("nearExpiringItems")]
+    public int NearExpiringItems { get; set; }
+
+    [JsonPropertyName("nonCompliantItems")]
+    public int NonCompliantItems { get; set; }
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; }
+
+    [JsonPropertyName("tradingName")]
+    public object? TradingName { get; set; }
+
+    [JsonPropertyName("stateCode")]
+    public string StateCode { get; set; } = string.Empty;
+
+    [JsonPropertyName("country")]
+    public string Country { get; set; } = string.Empty;
+
+    [JsonPropertyName("postcode")]
+    public string Postcode { get; set; } =string.Empty;
+
+    [JsonPropertyName("phone")]
+    public string Phone { get; set; } = string.Empty;
+
+    [JsonPropertyName("contacts")]
+    public List<Contact> Contacts { get; set; } = [];
+
+    [JsonPropertyName("complianceItems")]
+    public List<ComplianceItem> ComplianceItems { get; set; } = [];
+
+    [JsonPropertyName("records")]
+    public List<Record> Records { get; set; } = [];
 }
 
-/// <summary>
-/// Model representing a contact record for a contractor.
-/// </summary>
-public class ContactModel
+public class Contact
 {
-    /// <summary>
-    /// Gets or sets the unique identifier for the contact record.
-    /// </summary>
-    public int ContactId { get; set; }
-    
-    /// <summary>
-    /// Gets or sets the type of contact (e.g., primary, secondary).
-    /// </summary>
+    [JsonPropertyName("contactID")]
+    public int ContactID { get; set; }
+
+    [JsonPropertyName("contactType")]
     public string ContactType { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Gets or sets the email address of the contact.
-    /// </summary>
+    [JsonPropertyName("firstName")]
+    public string FirstName { get; set; } = string.Empty;
+
+    [JsonPropertyName("lastName")]
+    public string LastName { get; set; } = string.Empty;
+
+    [JsonPropertyName("emailAddress")]
     public string EmailAddress { get; set; } = string.Empty;
+}
+
+public class ComplianceItem
+{
+    [JsonPropertyName("itemType")]
+    public string ItemType { get; set; } = string.Empty;
+
+    [JsonPropertyName("itemDescription")]
+    public string ItemDescription { get; set; } = string.Empty;
+
+    [JsonPropertyName("complianceItemID")]
+    public int? ComplianceItemID { get; set; }
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    [JsonPropertyName("isRequired")]
+    public bool IsRequired { get; set; }
+
+    [JsonPropertyName("isCompliant")]
+    public bool IsCompliant { get; set; }
+
+    [JsonPropertyName("isNearExpiring")]
+    public bool IsNearExpiring { get; set; }
+}
+
+public class Record
+{
+    [JsonPropertyName("recordID")]
+    public int RecordID { get; set; }
+
+    [JsonPropertyName("recordType")]
+    public string RecordType { get; set; } = string.Empty;
+
+    [JsonPropertyName("recordTypeID")]
+    public int RecordTypeID { get; set; }
+
+    [JsonPropertyName("expiryType")]
+    public string ExpiryType { get; set; } = string.Empty;
+
+    [JsonPropertyName("specialInstructions")]
+    public string SpecialInstructions { get; set; } = string.Empty;
+
+    [JsonPropertyName("templateFileName")]
+    public string TemplateFileName { get; set; } = string.Empty;
+
+    [JsonPropertyName("templateFileSize")]
+    public int? TemplateFileSize { get; set; }
+
+    [JsonPropertyName("reference")]
+    public string Reference { get; set; } = string.Empty;
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("expiresOnUtc")]
+    public DateTime ExpiresOnUtc { get; set; }
+
+    [JsonPropertyName("recordStatus")]
+    public string RecordStatus { get; set; } = string.Empty;
+
+    [JsonPropertyName("createdOnUtc")]
+    public DateTime CreatedOnUtc { get; set; }
 }

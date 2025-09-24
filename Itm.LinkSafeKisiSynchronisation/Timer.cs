@@ -1,7 +1,10 @@
-using Itm.LinkSafeKisiSynchronisation.LinkSafeModels;
+using Itm.LinkSafeKisiSynchronisation.KisisModels;
+using Itm.LinkSafeKisiSynchronisation.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System.Linq;
 using System.Net;
 
 namespace Itm.LinkSafeKisiSynchronisation;
@@ -13,18 +16,19 @@ namespace Itm.LinkSafeKisiSynchronisation;
 /// <remarks>
 /// Initializes a new instance of the Timer class with required dependencies.
 /// </remarks>
-/// <param name="loggerFactory">Factory for creating loggers</param>
-/// <param name="errorService">Service for handling and reporting errors</param>
-/// <param name="linkSafe">Service for interacting with LinkSafe API</param>
-/// <param name="kisis">Service for interacting with Kisi API</param>
+/// <param name="_logger">Factory for creating loggers</param>
+/// <param name="_errorService">Service for handling and reporting errors</param>
+/// <param name="_linkSafeService">Service for interacting with LinkSafe API</param>
+/// <param name="_kisis">Service for interacting with Kisi API</param>
 public class Timer(
-    ILoggerFactory loggerFactory,
-    ErrorService errorService,
-    LinkSafe linkSafe,
-    Kisis kisis
+    ILoggerFactory _logger,
+    ErrorService _errorService,
+    LinkSafe _linkSafeService,
+    Kisis _kisis,
+    IOptions<KisisConfig> _config
         )
 {
-    private readonly ILogger _logger = loggerFactory.CreateLogger<Timer>();
+    private readonly ILogger _logger = _logger.CreateLogger<Timer>();
 
     /// <summary>
     /// HTTP trigger function that allows manual execution of the synchronization process.
@@ -38,13 +42,11 @@ public class Timer(
     {
         try
         {
+            (int added, int updated, int deleted) = await SynchonizeKisiAndLinksafe();
 
-            _logger.LogInformation("C# HTTP trigger function processed a request.");
-            await Process();
             HttpResponseData response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
-
-            await response.WriteStringAsync("Welcome to Azure Functions!");
+            await response.WriteStringAsync($"Successfully completed the synchronization of linksafe and kisi! Removed: {deleted} workers. Added {added} workers. Updated {updated} workers.");
 
             return response;
         }
@@ -64,59 +66,95 @@ public class Timer(
     /// <param name="myTimer">Timer information from the Azure Functions runtime</param>
     /// <returns>A task representing the asynchronous operation</returns>
     [Function("Timer")]
-    public async Task Run([TimerTrigger("0 0 * * * *")] TimerInfo myTimer)
-    {
-        await Process();
-    }
-
+    public async Task Run([TimerTrigger("0 0 * * * *")] TimerInfo timerInfo) => await SynchonizeKisiAndLinksafe();
 
     /// <summary>
-    /// Main synchronization process that retrieves workers from LinkSafe and syncs their access permissions in Kisi.
+    /// Synchonizes workers between LinkSafe and Kisi systems.
     /// </summary>
-    /// <returns>A task representing the asynchronous operation</returns>
-    public async Task Process()
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task<(int added, int updated, int deleted)> SynchonizeKisiAndLinksafe(CancellationToken cancellationToken = default)
     {
         try
         {
-            // Dictionary to store worker contracts by email address
-            // Key: Worker's email address
-            // Value: HashSet of tuples containing (validFrom, validUntil) dates for each contract/induction period
-            Dictionary<string, HashSet<(DateTime validFrom, DateTime validUntil)>> workersAndInductions = [];
+            // Create the mathced models from the linksafe workers
+            MatchedModel[] allWorkers = [.. (await _linkSafeService.MatchWorkersToTheirContractor()).Select(x => new MatchedModel(x, _config))];
 
-            // Retrieve all workers from LinkSafe system
-            WorkerModel[] workers = await linkSafe.GetWorkers();
+            // Get all of the kisi workers
+            List<GroupLinksModel> kisiModels = await _kisis.GetGroupLinks(0, [], cancellationToken);
 
-            // Process each worker to extract their contract/induction periods
-            foreach (WorkerModel worker in workers)
+            // Find the list of workers to remove from kisi 
+            List<MatchedModel> nonCompliantWorkers = [.. allWorkers.Where(x => !x.IsCompliant)];
+
+            // Find the list of workers to add to kisi
+            List<MatchedModel> compliantWorkers = [.. allWorkers.Where(x => x.IsCompliant)];
+
+            // Determin which workers will need to be updated and created
+            Dictionary<GroupLinksModel, MatchedModel> workersToUpdate = [];
+            List<MatchedModel> workersToAdd = [];
+
+            foreach (MatchedModel workerToCheck in compliantWorkers)
             {
-                // Check if we already have an entry for this worker's email address
-                // If not, create a new HashSet to store their contract periods
-                if (!workersAndInductions.TryGetValue(worker.EmailAddress, out HashSet<(DateTime validFrom, DateTime validUntil)>? value))
+                GroupLinksModel? kisiModel = kisiModels.FirstOrDefault(x => x.Email.Equals(workerToCheck.EmailAddress, StringComparison.OrdinalIgnoreCase));
+                if (kisiModel is not null)
                 {
-                    value = [];
-                    workersAndInductions.Add(worker.EmailAddress, value);
+                    if (GrooupLinkNeedsToBeUpdated(workerToCheck, kisiModel))
+                        workersToUpdate.Add(kisiModel, workerToCheck);
                 }
-
-                // Add each induction period (contract period) for this worker
-                // Each induction represents a valid access period with start and end dates
-                foreach (InductionModel induction in worker.Inductions)
-                    value.Add((induction.InductedOnUtc, induction.ExpiresOnUtc));
+                else
+                    workersToAdd.Add(workerToCheck);
             }
 
-            // Synchronize each worker's access permissions in Kisi system
-            // For each worker, send their contract periods to Kisi to update their access rights
-            foreach (KeyValuePair<string, HashSet<(DateTime validFrom, DateTime validUntil)>> contract in workersAndInductions)
-                await kisis.SyncGroupLinks(contract.Key, [.. contract.Value]);
+            // Remove the non compliant workers from kisi.
+            GroupLinksModel[] groupIdsToRemove = [.. kisiModels
+            .Where(x => nonCompliantWorkers
+                .Any(y => x.Email.Equals(y.EmailAddress, StringComparison.OrdinalIgnoreCase)))];
+
+            // Remove the non compliant workers from kisi. Create an ienumberable of tasks to remove the group links
+            List<Task> removeTasks = [.. groupIdsToRemove.Select(group => _kisis.RemoveGroupLink(group.Id, cancellationToken))];
+            List<Task> addTasks = [.. workersToAdd.Select(i => _kisis.MakeGroupLink(i, cancellationToken))];
+
+            // In this scenario updates are just removes and adds
+            removeTasks.AddRange(workersToUpdate.Select(i => _kisis.RemoveGroupLink(i.Key.Id, cancellationToken)));
+            addTasks.AddRange(workersToUpdate.Select(i => _kisis.MakeGroupLink(i.Value, cancellationToken)));
+            
+            await StaticHelpers.RunWithRateLimit(removeTasks);
+            await StaticHelpers.RunWithRateLimit(addTasks);
+
+            kisiModels = [.. kisiModels.Except(groupIdsToRemove)];
+
+            // Add the compliant workers
+            return (workersToAdd.Count, workersToUpdate.Count, groupIdsToRemove.Length);
         }
         catch (Exception ex)
         {
-            // Log any unhandled errors that occur during the synchronization process
-            errorService.AddErrorLog($"an unhandeled error happened {ex}");
+            _errorService.AddErrorLog(ex.Message);
+            _logger.LogError(ex, "An error occurred during synchronization.");
+            throw;
         }
-        finally
-        {
-            // Always send error logs, regardless of success or failure
-            await errorService.Send();
-        }
+    }
+
+    /// <summary>
+    /// Determines if a group link needs to be updated based on differences between the matched model and the existing Kisi model.
+    /// </summary>
+    /// <param name="matchedModel">The matched model</param>
+    /// <param name="kisiModel">The Kisi Model</param>
+    /// <returns>false if matching</returns>
+    private static bool GrooupLinkNeedsToBeUpdated(MatchedModel matchedModel, GroupLinksModel kisiModel)
+    {
+        string groupSafeName = matchedModel.KisiName.Split(':')[0];
+        string kisiName = kisiModel.Name!.Split(':')[0];
+
+        if (!groupSafeName.Equals(kisiName, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Check if the valid from dates are different (ignore time zones)
+        if (!StaticHelpers.AreDatesEqualIgnoringTimeZone(kisiModel.ValidFrom, matchedModel.ValidFrom))
+            return true;
+        // Check if the valid to dates are different (ignore time zones)
+        if (!StaticHelpers.AreDatesEqualIgnoringTimeZone(kisiModel.ValidUntil, matchedModel.ValidTo))
+            return true;
+
+        return false;
     }
 }

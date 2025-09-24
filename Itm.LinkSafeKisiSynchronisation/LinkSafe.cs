@@ -45,17 +45,60 @@ public class LinkSafe
         WorkersModel? content = JsonSerializer.Deserialize<WorkersModel>(response.Content);
         if (content is null)
             return [];
-        
-        #if  DEBUG
+
+#if DEBUG
         if (content.Workers is [] or null)
         {
-            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "workers.json");
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Json/workers.json");
             string workersString = await File.ReadAllTextAsync(path);
             content = JsonSerializer.Deserialize<WorkersModel>(workersString);
         }
-        #endif
+#endif
 
         return content?.Workers ?? [];
+    }
+
+    public async Task<Contractor[]> GetContractors()
+    {
+        var response = await _client.ExecuteGetAsync("2.0/Compliance/Contractors/List");
+
+        if (response.Content == null)
+            return [];
+
+        ContractorsModel? content = JsonSerializer.Deserialize<ContractorsModel>(response.Content);
+        if (content is null)
+            return [];
+
+#if DEBUG
+        if (content.Contractors is [] or null)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Json/contractors.json");
+            string contractorString = await File.ReadAllTextAsync(path);
+            content = JsonSerializer.Deserialize<ContractorsModel>(contractorString);
+        }
+#endif
+
+        return content?.Contractors ?? [];
+    }
+
+    /// <summary>
+    /// Matches the worker to its related contractor
+    /// </summary>
+    /// <returns></returns>
+    public async Task<WorkerModel[]> MatchWorkersToTheirContractor()
+    {
+        WorkerModel[] workers = await GetWorkers();
+        Contractor[] contractors = await GetContractors();
+
+        foreach (WorkerModel worker in workers)
+        {
+            // Find the related contractor
+            Contractor? contractor = contractors.FirstOrDefault(x => x.ContractorID == worker.PrimaryContractor?.ContactorID);
+            if (contractor is not null)
+                worker.Contractor = contractor; 
+        }
+
+        return workers;
     }
 }
 

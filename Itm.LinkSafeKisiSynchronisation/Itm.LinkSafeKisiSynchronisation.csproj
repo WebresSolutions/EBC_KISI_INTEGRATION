@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <AzureFunctionsVersion>v4</AzureFunctionsVersion>
@@ -27,6 +27,7 @@
         <Using Include="System.Threading.ExecutionContext" Alias="ExecutionContext" />
     </ItemGroup>
 	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
-		<None Update="workers.json" CopyToOutputDirectory="PreserveNewest" />
+		<None Update="Json\workers.json" CopyToOutputDirectory="PreserveNewest" />
+		<None Update="Json\contractors.json" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 </Project>

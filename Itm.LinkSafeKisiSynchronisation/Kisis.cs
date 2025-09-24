@@ -1,9 +1,11 @@
 using Itm.LinkSafeKisiSynchronisation.KisisModels;
+using Itm.LinkSafeKisiSynchronisation.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RestSharp;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Itm.LinkSafeKisiSynchronisation;
 
@@ -34,136 +36,45 @@ public partial class Kisis
     }
 
     /// <summary>
-    /// Synchronizes group links for a specific email address by ensuring only valid date ranges exist.
-    /// Removes any existing group links that don't match the provided date ranges and creates new ones as needed.
+    /// Recursively get all of the data from the kisi API 
     /// </summary>
-    /// <param name="email">The email address to synchronize group links for</param>
-    /// <param name="dateRanges">Array of valid date ranges for the worker's access</param>
-    /// <param name="cancellationToken">Cancellation token for the operation</param>
-    /// <returns>A task representing the asynchronous operation</returns>
-    public async Task SyncGroupLinks(string email, (DateTime validFrom, DateTime validUntil)[] dateRanges,
-        CancellationToken cancellationToken = default)
+    /// <param name="pageOffset">The initialoffset</param>
+    /// <param name="list">The list set the empty initially </param>
+    /// <param name="cancellationToken">A cancellation token</param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    public async Task<List<GroupLinksModel>> GetGroupLinks(int pageOffset, List<GroupLinksModel> list, CancellationToken cancellationToken)
     {
-        // email = "kaleb.mcghie@itmagnet.com.au";
+        RestRequest link = new("group_links");
+        link.AddQueryParameter("limit", 250).AddQueryParameter("offset", pageOffset * 250);
+        RestResponse request = await _client.GetAsync(link, cancellationToken: cancellationToken);
 
-        _logger.LogInformation("Syncing Email {Email}", email);
-        int pageCount = 0;
-        bool pagesLeft = true;
-        do
+        if (request.Content is null)
+            return list;
+
+        List<GroupLinksModel> content = JsonSerializer.Deserialize<List<GroupLinksModel>>(request.Content) ?? throw new Exception("failed to serialize the kisis response");
+        list.AddRange(content);
+
+        // Read the headers the ensure there are no more pages
+        HeaderParameter header = request.Headers!.First(i => String.Equals(i.Name, "x-collection-range", StringComparison.OrdinalIgnoreCase));
+        Regex regex = MyRegex();
+        Match match = regex.Match(header.Value.ToString());
+        
+        int end = int.Parse(match.Groups["end"].Value);
+        int total = int.Parse(match.Groups["total"].Value);
+       
+        // Recurrsively get more
+        if (total > end)
         {
+            // Safety to stop infinite loop bc there shouldnt be more than 2500 records
+            if (pageOffset > 10)
+                return list;
 
-            _logger.LogInformation("getting page {pageCount}", pageCount);
-            (RestRequest link, RestResponse request, List<GroupLinksModel> content) = await GetGroupLinks(pageCount, cancellationToken);
-
-            _logger.LogInformation("doing clean up");
-            if (content?.Count > 0)
-            {
-                // filter by prefix and by email
-                IEnumerable<GroupLinksModel> filteredContent = content
-                    .Where(i => i.Name?.StartsWith(_config.Value.NamePrefix) ?? false)
-                    .Where(i => i.Name?.Contains(email) ?? false);
-                List<GroupLinksModel> groupLinksModels = [.. filteredContent];
-                if (groupLinksModels.Count is not 0)
-                {
-                    // remove old
-                    foreach (GroupLinksModel? groupLink in groupLinksModels)
-                    {
-                        bool found = false;
-                        foreach ((DateTime validFrom, DateTime validUntil) range in dateRanges)
-                        {
-
-                            try
-                            {
-                                if (groupLink.Name == GetName(email, range.validFrom, range.validUntil))
-                                {
-                                    found = true;
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                _logger.LogCritical(e, "");
-                            }
-
-                        }
-
-                        if (!found)
-                        {
-                            _logger.LogInformation("Removing link {linkId}", groupLink.Id);
-                            try
-                            {
-                                await RemoveGroupLink(groupLink.Id, cancellationToken);
-                            }
-                            catch (Exception e)
-                            {
-                                _logger.LogCritical(e, "HOW?");
-                            }
-                        }
-                    }
-
-                }
-            }
-            _logger.LogInformation("DONE doing clean up");
-
-
-            request = await _client.GetAsync(link, cancellationToken: cancellationToken);
-            content = JsonSerializer.Deserialize<List<GroupLinksModel>>(request.Content) ?? [];
-            _logger.LogInformation("adding new links");
-            if (content?.Count > 0)
-            {
-                // add new
-                foreach ((DateTime validFrom, DateTime validUntil) in dateRanges)
-                {
-                    bool found = false;
-                    GroupLinksModel? foundItem = null;
-                    foreach (GroupLinksModel? item in content.Where(i => i.Name?.StartsWith(_config.Value.NamePrefix) ?? false))
-                    {
-                        string name = GetName(email, validFrom, validUntil);
-                        if (item.Name == name)
-                        {
-                            found = true;
-                            foundItem = item;
-                        }
-                    }
-                    if (!found)
-                    {
-                        _logger.LogInformation("Making link {email}: {validFrom} - {validUntil}", email, validFrom, validUntil);
-                        await MakeGroupLink(email, validFrom, validUntil, cancellationToken);
-                    }
-                    else
-                    {
-                        _logger.LogInformation("found group link {linkId}: {name}", foundItem?.Id, foundItem?.Name);
-                    }
-
-                }
-
-
-            }
-            _logger.LogInformation("DONE adding new links");
-            HeaderParameter header = request.Headers.First(i => String.Equals(i.Name, "x-collection-range", StringComparison.OrdinalIgnoreCase));
-            Regex regex = MyRegex();
-            Match match = regex.Match(header.Value.ToString());
-            int end = int.Parse(match.Groups["end"].Value);
-            int total = int.Parse(match.Groups["total"].Value);
-            if (end > total)
-            {
-                pagesLeft = false;
-            }
-            pageCount++;
-
-        } while (pagesLeft);
-
-        async Task<(RestRequest link, RestResponse request, List<GroupLinksModel> content)> GetGroupLinks(int pageCount, CancellationToken cancellationToken)
-        {
-            RestRequest link = new("group_links");
-            link.AddQueryParameter("limit", 250).AddQueryParameter("offset", pageCount * 250);
-            RestResponse request = await _client.GetAsync(link, cancellationToken: cancellationToken);
-
-            if (request.Content is null)
-                return (link, request, []);
-
-            List<GroupLinksModel>? content = JsonSerializer.Deserialize<List<GroupLinksModel>>(request.Content);
-            return (link, request, content);
+            pageOffset++;
+            await GetGroupLinks(pageOffset, list, cancellationToken);
         }
+
+        return list;
     }
 
     /// <summary>
@@ -219,6 +130,33 @@ public partial class Kisis
     }
 
     /// <summary>
+    /// Creates a new group link in Kisi for a worker based on a MatchedModel containing email and validity dates.
+    /// </summary>
+    /// <param name="model">The model being used to create the group link</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns></returns>
+    public async Task MakeGroupLink(MatchedModel model, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            RestRequest request = new("group_links", Method.Post);
+            request.AddJsonBody(model.CreateGroupLinkModel(_config));
+            Console.WriteLine($"Added Worker: {model.WorkerModel.FirstName}");
+
+            if (!_readOnly)
+            {
+                RestResponse content = await _client.ExecuteAsync(request, cancellationToken: cancellationToken);
+                _logger.LogInformation("Id: {id}", content.Content);
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.LogCritical(e, "failed to remove group link");
+            _errorService.AddErrorLog($"failed to make a group link for {model.EmailAddress} with the ranges of {model.ValidFrom} - {model.ValidTo}");
+        }
+    }
+
+    /// <summary>
     /// Removes a group link from Kisi by its ID.
     /// </summary>
     /// <param name="id">The ID of the group link to remove</param>
@@ -228,6 +166,7 @@ public partial class Kisis
     {
         try
         {
+            Console.WriteLine($"Removed Worker: {id}");
             if (!_readOnly)
                 await _client.DeleteAsync(new RestRequest($"group_link/{id}"), cancellationToken: cancellationToken);
         }

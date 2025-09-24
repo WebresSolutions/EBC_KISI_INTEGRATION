@@ -41,7 +41,7 @@ public class GroupLinksModel
     /// Gets or sets the email address associated with the group link.
     /// </summary>
     [JsonPropertyName("email")]
-    public string? Email { get; set; }
+    public string Email { get; set; }
 
     /// <summary>
     /// Gets or sets the phone number associated with the group link.

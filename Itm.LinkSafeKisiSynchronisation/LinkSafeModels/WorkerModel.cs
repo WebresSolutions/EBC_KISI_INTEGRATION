@@ -30,7 +30,13 @@ public class WorkerModel
     /// </summary>
     [JsonPropertyName("emailAddress")]
     public string EmailAddress { get; set; } = string.Empty;
-    
+
+    /// <summary>
+    /// The first name of the worker
+    /// </summary>
+    [JsonPropertyName("firstName")]
+    public string FirstName { get; set; } = string.Empty;
+
     /// <summary>
     /// Gets or sets the array of induction records for the worker.
     /// </summary>
@@ -39,6 +45,14 @@ public class WorkerModel
 
     [JsonPropertyName("isCompliant")]
     public bool IsCompliant{ get; set; }
+
+    [JsonPropertyName("primaryContractor")]
+    public PrimaryContractor? PrimaryContractor { get; set; }
+
+    /// <summary>
+    /// The primary contactor
+    /// </summary>
+    public Contractor?  Contractor { get; set; } 
 }
 
 /// <summary>
@@ -63,4 +77,13 @@ public class InductionModel
     /// </summary>
     [JsonPropertyName("expiresOnUtc")]
     public DateTime ExpiresOnUtc { get; set; }
+}
+
+public class PrimaryContractor
+{
+    [JsonPropertyName("contractorID")]
+    public int ContactorID { get; set; }
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } =string.Empty;
 }
