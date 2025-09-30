@@ -52,3 +52,6 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+/Itm.LinkSafeKisiSynchronisation/Properties
+/.vs/Itm.LinkSafeKisiSynchronisation/v18/TestStore/0
+/.vs/Itm.LinkSafeKisiSynchronisation/FileContentIndex
