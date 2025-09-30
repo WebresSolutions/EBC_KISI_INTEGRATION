@@ -5,7 +5,6 @@ using Microsoft.Extensions.Options;
 using RestSharp;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Threading;
 
 namespace Itm.LinkSafeKisiSynchronisation;
 
@@ -19,7 +18,7 @@ public partial class Kisis
     private readonly ErrorService _errorService;
     private readonly ILogger<Kisis> _logger;
     private readonly IOptions<KisisConfig> _config;
-    private static bool _readOnly = true;
+
     /// <summary>
     /// Initializes a new instance of the Kisi service with required dependencies.
     /// </summary>
@@ -59,10 +58,10 @@ public partial class Kisis
         HeaderParameter header = request.Headers!.First(i => String.Equals(i.Name, "x-collection-range", StringComparison.OrdinalIgnoreCase));
         Regex regex = MyRegex();
         Match match = regex.Match(header.Value.ToString());
-        
+
         int end = int.Parse(match.Groups["end"].Value);
         int total = int.Parse(match.Groups["total"].Value);
-       
+
         // Recurrsively get more
         if (total > end)
         {
@@ -84,8 +83,10 @@ public partial class Kisis
     /// <param name="validFrom">Optional start date for validity period</param>
     /// <param name="validUntil">Optional end date for validity period</param>
     /// <returns>A formatted name string for the group link</returns>
-    public string GetName(string email, DateTime? validFrom = null, DateTime? validUntil = null) =>
-        $"{_config.Value.NamePrefix} {email}: {validFrom} - {validUntil}";
+    public string GetName(string email, DateTime? validFrom = null, DateTime? validUntil = null)
+    {
+        return $"{_config.Value.NamePrefix} {email}: {validFrom} - {validUntil}";
+    }
 
     /// <summary>
     /// Creates a new group link in Kisi for a worker with specified validity dates.
@@ -115,11 +116,8 @@ public partial class Kisis
 
             });
 
-            if (!_readOnly)
-            {
-                RestResponse content = await _client.ExecuteAsync(request, cancellationToken: cancellationToken);
-                _logger.LogInformation("Id: {id}", content.Content);
-            }
+            RestResponse content = await _client.ExecuteAsync(request, cancellationToken: cancellationToken);
+            _logger.LogInformation("Id: {id}", content.Content);
         }
         catch (Exception e)
         {
@@ -143,11 +141,9 @@ public partial class Kisis
             request.AddJsonBody(model.CreateGroupLinkModel(_config));
             Console.WriteLine($"Added Worker: {model.WorkerModel.FirstName}");
 
-            if (!_readOnly)
-            {
-                RestResponse content = await _client.ExecuteAsync(request, cancellationToken: cancellationToken);
-                _logger.LogInformation("Id: {id}", content.Content);
-            }
+            RestResponse content = await _client.ExecuteAsync(request, cancellationToken: cancellationToken);
+            _logger.LogInformation("Id: {id}", content.Content);
+
         }
         catch (Exception e)
         {
@@ -167,8 +163,9 @@ public partial class Kisis
         try
         {
             Console.WriteLine($"Removed Worker: {id}");
-            if (!_readOnly)
-                await _client.DeleteAsync(new RestRequest($"group_link/{id}"), cancellationToken: cancellationToken);
+            RestRequest restRequest = new($"group_links/{id}", Method.Delete);
+            RestResponse result = await _client.ExecuteAsync(restRequest, cancellationToken: cancellationToken);
+            ;
         }
         catch (Exception e)
         {

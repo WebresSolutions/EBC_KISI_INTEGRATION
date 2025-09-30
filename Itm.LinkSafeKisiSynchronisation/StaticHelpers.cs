@@ -1,7 +1,7 @@
 ﻿
 namespace Itm.LinkSafeKisiSynchronisation;
 
-internal static class StaticHelpers
+public static class StaticHelpers
 {
     /// <summary>
     /// Are dates equal ignoring time zone differences

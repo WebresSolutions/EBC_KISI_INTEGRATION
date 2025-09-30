@@ -4,7 +4,6 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Linq;
 using System.Net;
 
 namespace Itm.LinkSafeKisiSynchronisation;
@@ -111,15 +110,7 @@ public class Timer(
                 .Any(y => x.Email.Equals(y.EmailAddress, StringComparison.OrdinalIgnoreCase)))];
 
             // Remove the non compliant workers from kisi. Create an ienumberable of tasks to remove the group links
-            List<Task> removeTasks = [.. groupIdsToRemove.Select(group => _kisis.RemoveGroupLink(group.Id, cancellationToken))];
-            List<Task> addTasks = [.. workersToAdd.Select(i => _kisis.MakeGroupLink(i, cancellationToken))];
-
-            // In this scenario updates are just removes and adds
-            removeTasks.AddRange(workersToUpdate.Select(i => _kisis.RemoveGroupLink(i.Key.Id, cancellationToken)));
-            addTasks.AddRange(workersToUpdate.Select(i => _kisis.MakeGroupLink(i.Value, cancellationToken)));
-            
-            await StaticHelpers.RunWithRateLimit(removeTasks);
-            await StaticHelpers.RunWithRateLimit(addTasks);
+            await UpdateAndRemoveInKisi(workersToUpdate, workersToAdd, groupIdsToRemove, cancellationToken);
 
             kisiModels = [.. kisiModels.Except(groupIdsToRemove)];
 
@@ -132,6 +123,30 @@ public class Timer(
             _logger.LogError(ex, "An error occurred during synchronization.");
             throw;
         }
+    }
+
+    /// <summary>
+    /// Updates and removes group links in Kisi based on the provided lists of workers to update, add, and remove.
+    /// </summary>
+    /// <param name="workersToUpdate">The workers to update</param>
+    /// <param name="workersToAdd">The workers to add</param>
+    /// <param name="groupIdsToRemove">The workers to remove</param>
+    /// <param name="cancellationToken">A cancellation token</param>
+    /// <returns></returns>
+    private async Task UpdateAndRemoveInKisi(Dictionary<GroupLinksModel, MatchedModel> workersToUpdate, List<MatchedModel> workersToAdd, GroupLinksModel[] groupIdsToRemove, CancellationToken cancellationToken)
+    {
+        foreach (GroupLinksModel group in groupIdsToRemove)
+            await _kisis.RemoveGroupLink(group.Id, cancellationToken);
+
+        foreach (MatchedModel model in workersToAdd)
+            await _kisis.MakeGroupLink(model, cancellationToken);
+
+        // In this scenario updates are just removes and adds
+        foreach (KeyValuePair<GroupLinksModel, MatchedModel> item in workersToUpdate)
+            await _kisis.RemoveGroupLink(item.Key.Id, cancellationToken);
+
+        foreach (KeyValuePair<GroupLinksModel, MatchedModel> item in workersToUpdate)
+            await _kisis.MakeGroupLink(item.Value, cancellationToken);
     }
 
     /// <summary>
@@ -152,9 +167,6 @@ public class Timer(
         if (!StaticHelpers.AreDatesEqualIgnoringTimeZone(kisiModel.ValidFrom, matchedModel.ValidFrom))
             return true;
         // Check if the valid to dates are different (ignore time zones)
-        if (!StaticHelpers.AreDatesEqualIgnoringTimeZone(kisiModel.ValidUntil, matchedModel.ValidTo))
-            return true;
-
-        return false;
+        return !StaticHelpers.AreDatesEqualIgnoringTimeZone(kisiModel.ValidUntil, matchedModel.ValidTo);
     }
 }
